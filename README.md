@@ -28,6 +28,11 @@ npm run dev
 
 # Start Worker (separate terminal)
 npm run worker:dev
+
+# Start Frontend (separate terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
 ## Usage
@@ -61,6 +66,7 @@ Get Gemini key: https://makersuite.google.com/app/apikey
 - `npm run dev` - API
 - `npm run worker:dev` - Worker
 - `npm run db:migrate` - Migrations
+- `cd frontend && npm run dev` - Frontend
 
 ## How it works
 
@@ -108,3 +114,21 @@ Events:
 - `job.processing` - Job started
 - `job.completed` - Job finished
 - `job.failed` - Job failed
+
+## Frontend
+
+Minimal React UI to interact with API.
+
+Start frontend:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173
+
+Features:
+- Create jobs (text/image)
+- List jobs
+- View job details (polls every 3s)
