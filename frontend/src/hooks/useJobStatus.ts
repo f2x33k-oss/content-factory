@@ -1,46 +1,37 @@
 import { useEffect, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import io from 'socket.io-client';
 
-const API_URL = 'http://localhost:3000';
-
-interface JobStatusEvent {
-  jobId: string;
-  status: string;
-}
-
-export function useJobStatus(jobId: string) {
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [lastEvent, setLastEvent] = useState<JobStatusEvent | null>(null);
+export function useJobStatus(jobId: string | null) {
+  const [socket, setSocket] = useState<any>(null);
 
   useEffect(() => {
-    // Connect to WebSocket
-    const newSocket = io(API_URL);
+    if (!jobId) return;
 
+    const newSocket = io('http://localhost:3000');
+    
     newSocket.on('connect', () => {
-      // Subscribe to job updates
+      console.log('🔌 WebSocket connected');
       newSocket.emit('subscribe', { jobId });
     });
 
-    // Listen for job events
-    newSocket.on('job.processing', (data: JobStatusEvent) => {
-      setLastEvent(data);
+    newSocket.on('job.processing', (data: any) => {
+      console.log('📨 Job processing:', data);
     });
 
-    newSocket.on('job.completed', (data: JobStatusEvent) => {
-      setLastEvent(data);
+    newSocket.on('job.completed', (data: any) => {
+      console.log('✅ Job completed:', data);
     });
 
-    newSocket.on('job.failed', (data: JobStatusEvent) => {
-      setLastEvent(data);
+    newSocket.on('job.failed', (data: any) => {
+      console.log('❌ Job failed:', data);
     });
 
     setSocket(newSocket);
 
     return () => {
-      newSocket.emit('unsubscribe', { jobId });
       newSocket.disconnect();
     };
   }, [jobId]);
 
-  return { socket, lastEvent };
+  return socket;
 }
