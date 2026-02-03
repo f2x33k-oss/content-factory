@@ -5,6 +5,7 @@ import { config } from './config/env.js';
 import { logger } from './config/logger.js';
 import { validateConfig } from './config/validator.js';
 import { generateText } from './services/gemini.js';
+import { publishJobEvent } from './services/pubsub.js';
 
 interface JobData {
   jobId: string;
@@ -29,6 +30,7 @@ async function processJob(job: Job<JobData>): Promise<any> {
     where: { id: jobId },
     data: { status: 'processing' },
   });
+  publishJobEvent(jobId, 'job.processing');
 
   try {
     const result = await generateText({ prompt: input.prompt || '' });
@@ -40,6 +42,7 @@ async function processJob(job: Job<JobData>): Promise<any> {
         output: { content: result.text },
       },
     });
+    publishJobEvent(jobId, 'job.completed');
 
     logger.info({ jobId }, 'Job completed');
     return result;
@@ -54,6 +57,7 @@ async function processJob(job: Job<JobData>): Promise<any> {
         error: error.message,
       },
     });
+    publishJobEvent(jobId, 'job.failed');
 
     throw error;
   }

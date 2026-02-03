@@ -128,20 +128,60 @@ Fields:
 - `msg`: Human-readable message
 - Additional context fields
 
-## WebSocket
+## Real-time Updates (WebSocket)
 
-Connect:
+Workers publish job status changes to Redis Pub/Sub.
+API listens to Redis and broadcasts via WebSocket.
+
+### How it works
+
+1. Worker updates job status in DB
+2. Worker publishes event to Redis (channel: "job-events")
+3. API receives event from Redis
+4. API broadcasts to WebSocket clients subscribed to jobId
+
+### Client usage
+
 ```javascript
 import { io } from 'socket.io-client';
+
 const socket = io('http://localhost:3000');
 
-socket.on('job.read', (data) => console.log(data));
-socket.on('job.list', (data) => console.log(data));
+// Subscribe to job updates
+socket.emit('subscribe', { jobId: 'your-job-id' });
+
+// Listen for events
+socket.on('job.processing', (data) => {
+  console.log('Job started:', data);
+  // { jobId: "xxx", status: "job.processing" }
+});
+
+socket.on('job.completed', (data) => {
+  console.log('Job completed:', data);
+  // { jobId: "xxx", status: "job.completed" }
+});
+
+socket.on('job.failed', (data) => {
+  console.log('Job failed:', data);
+  // { jobId: "xxx", status: "job.failed" }
+});
+
+// Unsubscribe
+socket.emit('unsubscribe', { jobId: 'your-job-id' });
 ```
 
-Events: `job.read`, `job.list`
+**Events:**
+- `job.processing` - Job started
+- `job.completed` - Job finished successfully
+- `job.failed` - Job failed
 
-Payload: `{ jobId: "string", status: "pending|processing|completed|failed" }`
+**Payload:**
+```json
+{
+  "jobId": "clx123456",
+  "status": "job.processing"
+}
+```
 
 ## Frontend
 
