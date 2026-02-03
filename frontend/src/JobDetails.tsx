@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useJobStatus } from '../hooks/useJobStatus';
 
 const API_URL = 'http://localhost:3000';
 
@@ -21,37 +20,27 @@ interface Props {
 export default function JobDetails({ jobId }: Props) {
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(false);
-  const { lastEvent } = useJobStatus(jobId);
-
-  const fetchJob = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/jobs/${jobId}`);
-      const data = await response.json();
-      setJob(data);
-    } catch (error) {
-      console.error('Failed to fetch job:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
+    const fetchJob = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_URL}/jobs/${jobId}`);
+        const data = await response.json();
+        setJob(data);
+      } catch (error) {
+        console.error('Failed to fetch job:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchJob();
-  }, [jobId]);
 
-  // Refetch when WebSocket event received
-  useEffect(() => {
-    if (lastEvent && lastEvent.jobId === jobId) {
-      fetchJob();
-    }
-  }, [lastEvent, jobId]);
-
-  // Polling fallback (every 10 seconds)
-  useEffect(() => {
+    // Poll every 3 seconds
     const interval = setInterval(() => {
       fetchJob();
-    }, 10000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [jobId]);
