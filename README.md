@@ -1,6 +1,6 @@
 # Content Factory
 
-API for async AI job processing.
+Production-ready API for async AI job processing with authentication.
 
 ## Setup
 
@@ -10,7 +10,7 @@ npm install
 
 # Configure .env
 cp .env.example .env
-# Add GEMINI_API_KEY
+# Required: JWT_SECRET, GEMINI_API_KEY
 
 # Start services
 docker compose up -d
@@ -19,63 +19,87 @@ docker compose up -d
 npm run db:generate
 npm run db:migrate
 
-# Create user
-docker exec -it content-factory-db psql -U postgres -d content_factory -c \
-  "INSERT INTO users (id, email) VALUES (1, 'dev@example.com') ON CONFLICT DO NOTHING;"
-
 # Start API
 npm run dev
 
 # Start Worker (separate terminal)
 npm run worker:dev
-
-# Start Frontend (separate terminal)
-cd frontend
-npm install
-npm run dev
 ```
 
-## Usage
+## Authentication
 
-Create job:
+All job endpoints require JWT authentication.
+
+### Register
+```bash
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "password123", "name": "User"}'
+```
+
+### Login
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "password123"}'
+```
+
+Response includes JWT token.
+
+### Authenticated Request
 ```bash
 curl -X POST http://localhost:3000/jobs \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{"type": "content_generation", "input": {"prompt": "Hello"}}'
 ```
 
-Get job:
-```bash
-curl http://localhost:3000/jobs/:id
-```
+## Environment Variables
 
-## Environment
-
+Required:
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/content_factory
 REDIS_HOST=localhost
 REDIS_PORT=6379
-GEMINI_API_KEY=your_key
+JWT_SECRET=your_secret_key_change_in_production
+GEMINI_API_KEY=your_gemini_key
+NODE_ENV=development
 WORKER_CONCURRENCY=3
 ```
 
-Get Gemini key: https://makersuite.google.com/app/apikey
+## Production Mode
 
-## Scripts
+Set `NODE_ENV=production` and update:
+- `JWT_SECRET` - Strong secret key
+- CORS allowed origins in `src/server.ts`
 
-- `npm run dev` - API
-- `npm run worker:dev` - Worker
-- `npm run db:migrate` - Migrations
-- `cd frontend && npm run dev` - Frontend
+Run:
+```bash
+npm start        # API
+npm run worker   # Worker
+```
 
-## How it works
+## Security Features
 
-1. POST /jobs → Creates job in DB
-2. Job pushed to Redis queue
-3. Worker picks up job
-4. Worker calls Gemini API
-5. Worker updates job status
-6. GET /jobs/:id → Returns result
+- JWT authentication (7-day expiry)
+- Bcrypt password hashing
+- User ownership enforcement on all jobs
+- Input validation (Zod)
+- Rate limiting (100 req/15min per IP)
+- CORS hardening (production mode)
+- No secrets in repository
+
+## API Endpoints
+
+**Auth:**
+- `POST /auth/register` - Create account
+- `POST /auth/login` - Get JWT token
+
+**Jobs (requires auth):**
+- `POST /jobs` - Create job
+- `GET /jobs` - List user's jobs
+- `GET /jobs/:id` - Get job details
+- `DELETE /jobs/:id` - Delete job
 
 ## WebSocket
 

@@ -1,24 +1,24 @@
-import express, { Request, Response } from 'express';
+import express, { Response } from 'express';
 import { prisma } from '../config/database.js';
-import { config } from '../config/env.js';
 import { jobQueue } from '../config/queue.js';
 import { emitJobEvent } from '../services/websocket.js';
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { validate, createJobSchema } from '../middleware/validation.js';
 
 const router = express.Router();
 
+// Apply auth middleware to all routes
+router.use(authMiddleware);
+
 // Create a new job
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', validate(createJobSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { type, input } = req.body;
-
-    if (!type || !input) {
-      return res.status(400).json({ error: 'Missing required fields: type, input' });
-    }
 
     // Create job in database
     const job = await prisma.job.create({
       data: {
-        userId: config.defaultUserId,
+        userId: req.userId!,
         type,
         status: 'pending',
         input,
@@ -32,7 +32,7 @@ router.post('/', async (req: Request, res: Response) => {
       type: job.type,
       input: job.input,
     }, {
-      jobId: job.id, // Use job.id as BullMQ job ID for tracking
+      jobId: job.id,
     });
 
     res.status(201).json(job);
@@ -43,11 +43,11 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // Get all jobs for the user
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const jobs = await prisma.job.findMany({
       where: {
-        userId: config.defaultUserId,
+        userId: req.userId,
       },
       orderBy: {
         createdAt: 'desc',
@@ -66,7 +66,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Get a specific job by ID
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -78,8 +78,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    // Check if job belongs to the hardcoded user
-    if (job.userId !== config.defaultUserId) {
+    if (job.userId !== req.userId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -93,7 +92,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // Update job status (manual for testing)
-router.patch('/:id', async (req: Request, res: Response) => {
+router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { status, output, error } = req.body;
@@ -106,7 +105,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    if (job.userId !== config.defaultUserId) {
+    if (job.userId !== req.userId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -127,7 +126,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 });
 
 // Delete a job
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -139,7 +138,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    if (job.userId !== config.defaultUserId) {
+    if (job.userId !== req.userId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
