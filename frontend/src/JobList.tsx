@@ -18,16 +18,35 @@ interface Props {
 export default function JobList({ refresh, onSelectJob, selectedJobId }: Props) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchJobs = async () => {
       setLoading(true);
+      setError(null);
       try {
         const response = await fetch(`${API_URL}/jobs`);
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            setError('Please login to see your jobs');
+            setJobs([]);
+            return;
+          }
+          throw new Error('Failed to fetch jobs');
+        }
+        
         const data = await response.json();
-        setJobs(data);
+        
+        if (Array.isArray(data)) {
+          setJobs(data);
+        } else {
+          setJobs([]);
+        }
       } catch (error) {
         console.error('Failed to fetch jobs:', error);
+        setError('Failed to load jobs');
+        setJobs([]);
       } finally {
         setLoading(false);
       }
@@ -37,10 +56,11 @@ export default function JobList({ refresh, onSelectJob, selectedJobId }: Props) 
   }, [refresh]);
 
   if (loading) return <div>Loading...</div>;
+  if (error) return <div>{error}</div>;
 
   return (
     <div>
-      {jobs.length === 0 ? (
+      {!jobs || jobs.length === 0 ? (
         <p>No jobs</p>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
