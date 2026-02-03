@@ -4,6 +4,7 @@ import { jobQueue } from '../config/queue.js';
 import { emitJobEvent } from '../services/websocket.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { validate, createJobSchema } from '../middleware/validation.js';
+import { logger } from '../config/logger.js';
 
 const router = express.Router();
 
@@ -36,8 +37,8 @@ router.post('/', validate(createJobSchema), async (req: AuthRequest, res: Respon
     });
 
     res.status(201).json(job);
-  } catch (error) {
-    console.error('Error creating job:', error);
+  } catch (error: any) {
+    logger.error({ error: error.message, userId: req.userId }, 'Failed to create job');
     res.status(500).json({ error: 'Failed to create job' });
   }
 });
@@ -59,8 +60,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     jobs.forEach(job => {
       emitJobEvent('job.list', job.id, job.status);
     });
-  } catch (error) {
-    console.error('Error fetching jobs:', error);
+  } catch (error: any) {
+    logger.error({ error: error.message, userId: req.userId }, 'Failed to fetch jobs');
     res.status(500).json({ error: 'Failed to fetch jobs' });
   }
 });
@@ -85,8 +86,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     res.json(job);
 
     emitJobEvent('job.read', job.id, job.status);
-  } catch (error) {
-    console.error('Error fetching job:', error);
+  } catch (error: any) {
+    logger.error({ error: error.message, userId: req.userId, jobId: id }, 'Failed to fetch job');
     res.status(500).json({ error: 'Failed to fetch job' });
   }
 });
@@ -119,8 +120,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
     });
 
     res.json(updatedJob);
-  } catch (error) {
-    console.error('Error updating job:', error);
+  } catch (error: any) {
+    logger.error({ error: error.message, userId: req.userId, jobId: id }, 'Failed to update job');
     res.status(500).json({ error: 'Failed to update job' });
   }
 });
@@ -147,8 +148,8 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     });
 
     res.status(204).send();
-  } catch (error) {
-    console.error('Error deleting job:', error);
+  } catch (error: any) {
+    logger.error({ error: error.message, userId: req.userId, jobId: id }, 'Failed to delete job');
     res.status(500).json({ error: 'Failed to delete job' });
   }
 });

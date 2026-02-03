@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
 import { config } from '../config/env.js';
+import { logger } from '../config/logger.js';
 import { validate, registerSchema, loginSchema } from '../middleware/validation.js';
 
 const router = express.Router();
@@ -42,8 +43,8 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
         name: user.name,
       },
     });
-  } catch (error) {
-    console.error('Register error:', error);
+  } catch (error: any) {
+    logger.error({ error: error.message, email: req.body.email }, 'Registration failed');
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -79,8 +80,8 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
         name: user.name,
       },
     });
-  } catch (error) {
-    console.error('Login error:', error);
+  } catch (error: any) {
+    logger.error({ error: error.message, email: req.body.email }, 'Login failed');
     res.status(500).json({ error: 'Login failed' });
   }
 });

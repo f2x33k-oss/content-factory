@@ -1,12 +1,24 @@
 import express from 'express';
 import { createServer } from 'http';
 import rateLimit from 'express-rate-limit';
+import Redis from 'ioredis';
 import { config } from './config/env.js';
 import { prisma } from './config/database.js';
+import { logger } from './config/logger.js';
+import { validateConfig } from './config/validator.js';
 import healthRouter from './routes/health.js';
 import jobsRouter from './routes/jobs.js';
 import authRouter from './routes/auth.js';
 import { setupWebSocket } from './services/websocket.js';
+
+// Validate configuration at startup
+try {
+  validateConfig();
+  logger.info('Configuration validated');
+} catch (error: any) {
+  logger.error({ error: error.message }, 'Configuration validation failed');
+  process.exit(1);
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -45,13 +57,30 @@ app.use((req, res, next) => {
 
 // Request logging
 app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${req.method} ${req.path}`);
+  logger.info({ method: req.method, path: req.path }, 'Request');
   next();
 });
 
 // Routes
 app.use('/health', healthRouter);
+
+// Readiness check
+app.get('/ready', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    const redis = new Redis({
+      host: config.redisHost,
+      port: config.redisPort,
+    });
+    await redis.ping();
+    await redis.quit();
+    res.json({ status: 'ready' });
+  } catch (error) {
+    logger.error({ error }, 'Readiness check failed');
+    res.status(503).json({ status: 'not ready' });
+  }
+});
+
 app.use('/auth', authRouter);
 app.use('/jobs', jobsRouter);
 
@@ -76,7 +105,12 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('[Error]', err);
+  logger.error({ 
+    error: err.message, 
+    stack: err.stack,
+    method: req.method,
+    path: req.path,
+  }, 'Request error');
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
   });
@@ -84,12 +118,30 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server
 httpServer.listen(config.port, () => {
-  console.log(`API running on http://localhost:${config.port}`);
-  console.log(`WebSocket ready`);
+  logger.info({ port: config.port, env: config.nodeEnv }, 'API started');
+  logger.info('WebSocket ready');
+});
+
+// Unhandled rejection handler
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error({ reason, promise }, 'Unhandled rejection');
+});
+
+// Uncaught exception handler
+process.on('uncaughtException', (error) => {
+  logger.error({ error: error.message, stack: error.stack }, 'Uncaught exception');
+  process.exit(1);
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
+  logger.info('Shutting down gracefully');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('Shutting down gracefully');
   await prisma.$disconnect();
   process.exit(0);
 });

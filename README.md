@@ -75,9 +75,11 @@ Set `NODE_ENV=production` and update:
 
 Run:
 ```bash
-npm start        # API
-npm run worker   # Worker
+NODE_ENV=production npm start        # API
+NODE_ENV=production npm run worker   # Worker
 ```
+
+App fails fast on startup if required env vars are missing.
 
 ## Security Features
 
@@ -88,6 +90,15 @@ npm run worker   # Worker
 - Rate limiting (100 req/15min per IP)
 - CORS hardening (production mode)
 - No secrets in repository
+
+## Health & Readiness
+
+**No auth required:**
+- `GET /health` - Returns 200 if app is alive
+- `GET /ready` - Returns 200 if DB + Redis are reachable, 503 otherwise
+
+Use `/health` for liveness probes.
+Use `/ready` for readiness probes.
 
 ## API Endpoints
 
@@ -100,6 +111,22 @@ npm run worker   # Worker
 - `GET /jobs` - List user's jobs
 - `GET /jobs/:id` - Get job details
 - `DELETE /jobs/:id` - Delete job
+
+## Logs
+
+All logs are structured JSON (Pino).
+
+Example:
+```json
+{"level":"info","time":"2026-02-03T10:00:00.000Z","service":"api","msg":"API started","port":3000,"env":"production"}
+```
+
+Fields:
+- `level`: info | warn | error
+- `time`: ISO timestamp
+- `service`: api | worker
+- `msg`: Human-readable message
+- Additional context fields
 
 ## WebSocket
 
