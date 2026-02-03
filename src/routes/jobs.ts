@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../config/database.js';
 import { config } from '../config/env.js';
 import { jobQueue } from '../config/queue.js';
+import { emitJobEvent } from '../services/websocket.js';
 
 const router = express.Router();
 
@@ -54,6 +55,10 @@ router.get('/', async (req: Request, res: Response) => {
     });
 
     res.json(jobs);
+
+    jobs.forEach(job => {
+      emitJobEvent('job.list', job.id, job.status);
+    });
   } catch (error) {
     console.error('Error fetching jobs:', error);
     res.status(500).json({ error: 'Failed to fetch jobs' });
@@ -79,6 +84,8 @@ router.get('/:id', async (req: Request, res: Response) => {
     }
 
     res.json(job);
+
+    emitJobEvent('job.read', job.id, job.status);
   } catch (error) {
     console.error('Error fetching job:', error);
     res.status(500).json({ error: 'Failed to fetch job' });

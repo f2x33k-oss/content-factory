@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
 
 const API_URL = 'http://localhost:3000';
 
@@ -38,27 +37,12 @@ export default function JobDetails({ jobId }: Props) {
 
     fetchJob();
 
-    // Connect to WebSocket
-    const socket = io(API_URL);
-
-    socket.emit('subscribe', { jobId });
-
-    socket.on('job.processing', () => {
+    // Poll every 3 seconds if job is not completed/failed
+    const interval = setInterval(() => {
       fetchJob();
-    });
+    }, 3000);
 
-    socket.on('job.completed', () => {
-      fetchJob();
-    });
-
-    socket.on('job.failed', () => {
-      fetchJob();
-    });
-
-    return () => {
-      socket.emit('unsubscribe', { jobId });
-      socket.disconnect();
-    };
+    return () => clearInterval(interval);
   }, [jobId]);
 
   if (loading && !job) return <div>Loading...</div>;

@@ -9,18 +9,6 @@ interface JobData {
   input: any;
 }
 
-async function notifyAPI(jobId: string, status: string) {
-  try {
-    await fetch(`http://localhost:${config.port}/events`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId, status }),
-    });
-  } catch (error) {
-    // Ignore if API is not available
-  }
-}
-
 async function processJob(job: Job<JobData>): Promise<any> {
   const { jobId, input } = job.data;
 
@@ -28,7 +16,6 @@ async function processJob(job: Job<JobData>): Promise<any> {
     where: { id: jobId },
     data: { status: 'processing' },
   });
-  await notifyAPI(jobId, 'job.processing');
 
   try {
     const result = await generateText({ prompt: input.prompt || '' });
@@ -40,7 +27,6 @@ async function processJob(job: Job<JobData>): Promise<any> {
         output: { content: result.text },
       },
     });
-    await notifyAPI(jobId, 'job.completed');
 
     return result;
 
@@ -52,7 +38,6 @@ async function processJob(job: Job<JobData>): Promise<any> {
         error: error.message,
       },
     });
-    await notifyAPI(jobId, 'job.failed');
 
     throw error;
   }

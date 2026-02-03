@@ -74,47 +74,23 @@ Get Gemini key: https://makersuite.google.com/app/apikey
 2. Job pushed to Redis queue
 3. Worker picks up job
 4. Worker calls Gemini API
-5. Worker updates job status in DB
-6. Worker notifies API via HTTP
-7. API emits WebSocket event to subscribed clients
+5. Worker updates job status
+6. GET /jobs/:id → Returns result
 
-## WebSocket (Real-time updates)
+## WebSocket
 
-Connect to WebSocket:
+Connect:
 ```javascript
 import { io } from 'socket.io-client';
-
 const socket = io('http://localhost:3000');
 
-// Subscribe to job updates
-socket.emit('subscribe', { jobId: 'your-job-id' });
-
-// Listen for events
-socket.on('job.processing', (data) => {
-  console.log('Job started:', data);
-});
-
-socket.on('job.completed', (data) => {
-  console.log('Job completed:', data);
-});
-
-socket.on('job.failed', (data) => {
-  console.log('Job failed:', data);
-});
+socket.on('job.read', (data) => console.log(data));
+socket.on('job.list', (data) => console.log(data));
 ```
 
-Event payload:
-```json
-{
-  "jobId": "clx123456",
-  "status": "job.processing"
-}
-```
+Events: `job.read`, `job.list`
 
-Events:
-- `job.processing` - Job started
-- `job.completed` - Job finished
-- `job.failed` - Job failed
+Payload: `{ jobId: "string", status: "pending|processing|completed|failed" }`
 
 ## Frontend
 

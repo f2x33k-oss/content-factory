@@ -10,21 +10,11 @@ export function setupWebSocket(httpServer: HTTPServer) {
     },
   });
 
-  io.on('connection', (socket) => {
-    socket.on('subscribe', (data: { jobId: string }) => {
-      socket.join(data.jobId);
-    });
-
-    socket.on('unsubscribe', (data: { jobId: string }) => {
-      socket.leave(data.jobId);
-    });
-  });
-
   return io;
 }
 
-export function emitJobStatus(jobId: string, status: string) {
+export function emitJobEvent(eventName: string, jobId: string, status: string) {
   if (io) {
-    io.to(jobId).emit(status, { jobId, status });
+    io.emit(eventName, { jobId, status });
   }
 }
