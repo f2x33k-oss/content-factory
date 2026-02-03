@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { prisma } from '../config/database.js';
 import { config } from '../config/env.js';
+import { jobQueue } from '../config/queue.js';
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields: type, input' });
     }
 
+    // Create job in database
     const job = await prisma.job.create({
       data: {
         userId: config.defaultUserId,
@@ -21,6 +23,15 @@ router.post('/', async (req: Request, res: Response) => {
         input,
         output: null,
       },
+    });
+
+    // Push job to queue for processing
+    await jobQueue.add('process-job', {
+      jobId: job.id,
+      type: job.type,
+      input: job.input,
+    }, {
+      jobId: job.id, // Use job.id as BullMQ job ID for tracking
     });
 
     res.status(201).json(job);
