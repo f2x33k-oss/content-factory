@@ -22,7 +22,7 @@ export async function generateText(input: GeminiInput): Promise<GeminiOutput> {
     throw new Error('GEMINI_API_KEY is not configured');
   }
 
-  const modelName = input.model || 'gemini-1.5-pro-latest';
+  const modelName = input.model || 'gemini-1.5-pro';
   const model = genAI.getGenerativeModel({ model: modelName });
 
   const result = await model.generateContent(input.prompt);
