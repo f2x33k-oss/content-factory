@@ -25,7 +25,12 @@ export default function JobDetails({ jobId }: Props) {
     const fetchJob = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_URL}/jobs/${jobId}`);
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/jobs/${jobId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         const data = await response.json();
         setJob(data);
       } catch (error) {

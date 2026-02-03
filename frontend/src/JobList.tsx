@@ -25,7 +25,12 @@ export default function JobList({ refresh, onSelectJob, selectedJobId }: Props) 
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_URL}/jobs`);
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/jobs`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
         if (!response.ok) {
           if (response.status === 401) {

@@ -21,9 +21,13 @@ export default function CreateJob({ onCreated }: Props) {
 
     setLoading(true);
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_URL}/jobs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           type,
           input: { prompt }
