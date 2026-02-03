@@ -1,5 +1,4 @@
 import { Worker, Job } from 'bullmq';
-import Redis from 'ioredis';
 import { prisma } from './config/database.js';
 import { redisConnection } from './config/queue.js';
 import { config } from './config/env.js';
@@ -10,14 +9,16 @@ interface JobData {
   input: any;
 }
 
-// Redis publisher for Pub/Sub
-const redisPublisher = new Redis({
-  host: config.redisHost,
-  port: config.redisPort,
-});
-
-function publishEvent(jobId: string, status: string) {
-  redisPublisher.publish('job-events', JSON.stringify({ jobId, status }));
+async function notifyAPI(jobId: string, status: string) {
+  try {
+    await fetch(`http://localhost:${config.port}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId, status }),
+    });
+  } catch (error) {
+    // Ignore if API is not available
+  }
 }
 
 async function processJob(job: Job<JobData>): Promise<any> {
@@ -27,7 +28,7 @@ async function processJob(job: Job<JobData>): Promise<any> {
     where: { id: jobId },
     data: { status: 'processing' },
   });
-  publishEvent(jobId, 'job.processing');
+  await notifyAPI(jobId, 'job.processing');
 
   try {
     const result = await generateText({ prompt: input.prompt || '' });
@@ -39,7 +40,7 @@ async function processJob(job: Job<JobData>): Promise<any> {
         output: { content: result.text },
       },
     });
-    publishEvent(jobId, 'job.completed');
+    await notifyAPI(jobId, 'job.completed');
 
     return result;
 
@@ -51,7 +52,7 @@ async function processJob(job: Job<JobData>): Promise<any> {
         error: error.message,
       },
     });
-    publishEvent(jobId, 'job.failed');
+    await notifyAPI(jobId, 'job.failed');
 
     throw error;
   }

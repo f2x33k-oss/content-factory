@@ -4,6 +4,7 @@ import { config } from './config/env.js';
 import { prisma } from './config/database.js';
 import healthRouter from './routes/health.js';
 import jobsRouter from './routes/jobs.js';
+import eventsRouter from './routes/events.js';
 import { setupWebSocket } from './services/websocket.js';
 
 const app = express();
@@ -32,6 +33,7 @@ app.use((req, res, next) => {
 // Routes
 app.use('/health', healthRouter);
 app.use('/jobs', jobsRouter);
+app.use('/events', eventsRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {

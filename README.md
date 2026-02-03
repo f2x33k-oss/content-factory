@@ -74,8 +74,9 @@ Get Gemini key: https://makersuite.google.com/app/apikey
 2. Job pushed to Redis queue
 3. Worker picks up job
 4. Worker calls Gemini API
-5. Worker updates job status
-6. GET /jobs/:id → Returns result
+5. Worker updates job status in DB
+6. Worker notifies API via HTTP
+7. API emits WebSocket event to subscribed clients
 
 ## WebSocket (Real-time updates)
 
