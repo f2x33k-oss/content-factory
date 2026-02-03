@@ -1,0 +1,41 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobs Job[]
+
+  @@map("users")
+}
+
+model Job {
+  id        String   @id @default(cuid())
+  userId    Int
+  type      String   // e.g., "content_generation", "ai_processing"
+  status    String   @default("pending") // pending, processing, completed, failed
+  input     Json     // JSON input data
+  output    Json?    // JSON output data (null until completed)
+  error     String?  // Error message if failed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("jobs")
+}
