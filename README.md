@@ -70,3 +70,41 @@ Get Gemini key: https://makersuite.google.com/app/apikey
 4. Worker calls Gemini API
 5. Worker updates job status
 6. GET /jobs/:id → Returns result
+
+## WebSocket (Real-time updates)
+
+Connect to WebSocket:
+```javascript
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3000');
+
+// Subscribe to job updates
+socket.emit('subscribe', { jobId: 'your-job-id' });
+
+// Listen for events
+socket.on('job.processing', (data) => {
+  console.log('Job started:', data);
+});
+
+socket.on('job.completed', (data) => {
+  console.log('Job completed:', data);
+});
+
+socket.on('job.failed', (data) => {
+  console.log('Job failed:', data);
+});
+```
+
+Event payload:
+```json
+{
+  "jobId": "clx123456",
+  "status": "job.processing"
+}
+```
+
+Events:
+- `job.processing` - Job started
+- `job.completed` - Job finished
+- `job.failed` - Job failed

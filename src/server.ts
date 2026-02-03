@@ -1,10 +1,16 @@
 import express from 'express';
+import { createServer } from 'http';
 import { config } from './config/env.js';
 import { prisma } from './config/database.js';
 import healthRouter from './routes/health.js';
 import jobsRouter from './routes/jobs.js';
+import { setupWebSocket } from './services/websocket.js';
 
 const app = express();
+const httpServer = createServer(app);
+
+// Setup WebSocket
+setupWebSocket(httpServer);
 
 // Middleware
 app.use(express.json());
@@ -24,7 +30,7 @@ app.get('/', (req, res) => {
   res.json({
     name: 'Content Factory API',
     version: '0.1.0',
-    phase: 'MVP - Phase 1',
+    phase: 'Phase 3',
     endpoints: {
       health: '/health',
       jobs: '/jobs',
@@ -38,15 +44,13 @@ app.use((req, res) => {
 });
 
 // Start server
-app.listen(config.port, () => {
-  console.log(`✅ Content Factory API running on http://localhost:${config.port}`);
-  console.log(`📊 Environment: ${config.nodeEnv}`);
-  console.log(`👤 Hardcoded User ID: ${config.defaultUserId}`);
+httpServer.listen(config.port, () => {
+  console.log(`API running on http://localhost:${config.port}`);
+  console.log(`WebSocket ready`);
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
   await prisma.$disconnect();
   process.exit(0);
 });

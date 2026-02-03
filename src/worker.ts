@@ -1,4 +1,5 @@
 import { Worker, Job } from 'bullmq';
+import Redis from 'ioredis';
 import { prisma } from './config/database.js';
 import { redisConnection } from './config/queue.js';
 import { config } from './config/env.js';
@@ -9,6 +10,16 @@ interface JobData {
   input: any;
 }
 
+// Redis publisher for Pub/Sub
+const redisPublisher = new Redis({
+  host: config.redisHost,
+  port: config.redisPort,
+});
+
+function publishEvent(jobId: string, status: string) {
+  redisPublisher.publish('job-events', JSON.stringify({ jobId, status }));
+}
+
 async function processJob(job: Job<JobData>): Promise<any> {
   const { jobId, input } = job.data;
 
@@ -16,6 +27,7 @@ async function processJob(job: Job<JobData>): Promise<any> {
     where: { id: jobId },
     data: { status: 'processing' },
   });
+  publishEvent(jobId, 'job.processing');
 
   try {
     const result = await generateText({ prompt: input.prompt || '' });
@@ -27,6 +39,7 @@ async function processJob(job: Job<JobData>): Promise<any> {
         output: { content: result.text },
       },
     });
+    publishEvent(jobId, 'job.completed');
 
     return result;
 
@@ -38,6 +51,7 @@ async function processJob(job: Job<JobData>): Promise<any> {
         error: error.message,
       },
     });
+    publishEvent(jobId, 'job.failed');
 
     throw error;
   }
