@@ -10,7 +10,7 @@ npm install
 
 # Configure .env
 cp .env.example .env
-# Required: JWT_SECRET, GEMINI_API_KEY
+# Required: JWT_SECRET, OPENAI_API_KEY
 
 # Start services
 docker compose up -d
@@ -62,7 +62,7 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/content_factory
 REDIS_HOST=localhost
 REDIS_PORT=6379
 JWT_SECRET=your_secret_key_change_in_production
-GEMINI_API_KEY=your_gemini_key
+OPENAI_API_KEY=your_openai_key
 NODE_ENV=development
 WORKER_CONCURRENCY=3
 ```

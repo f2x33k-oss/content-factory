@@ -15,7 +15,7 @@ export const config = {
   redisPort: parseInt(process.env.REDIS_PORT || '6379', 10),
   
   // AI APIs
-  geminiApiKey: process.env.GEMINI_API_KEY || '',
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
   sdxlApiUrl: process.env.SDXL_API_URL || '',
   sdxlApiKey: process.env.SDXL_API_KEY || '',
   

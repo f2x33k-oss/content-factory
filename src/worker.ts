@@ -4,7 +4,7 @@ import { redisConnection } from './config/queue.js';
 import { config } from './config/env.js';
 import { logger } from './config/logger.js';
 import { validateConfig } from './config/validator.js';
-import { generateText } from './services/gemini.js';
+import { generateText } from './services/openai.js';
 import { publishJobEvent } from './services/pubsub.js';
 
 interface JobData {

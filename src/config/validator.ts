@@ -5,7 +5,7 @@ export function validateConfig() {
     { name: 'DATABASE_URL', value: config.databaseUrl },
     { name: 'JWT_SECRET', value: config.jwtSecret },
     { name: 'REDIS_HOST', value: config.redisHost },
-    { name: 'GEMINI_API_KEY', value: config.geminiApiKey },
+    { name: 'OPENAI_API_KEY', value: config.openaiApiKey },
   ];
 
   const missing = required.filter(({ value }) => !value);
