@@ -2,6 +2,7 @@ import express, { Response } from 'express';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { logger } from '../config/logger.js';
+import { jobQueue } from '../config/queue.js';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -54,6 +55,16 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     });
 
     logger.info({ albumId: album.id, userId: req.userId, itemCount }, 'Album created');
+
+    // Push album generation job to queue
+    await jobQueue.add('recipe-album', {
+      albumId: album.id,
+      type: 'recipe_album',
+    }, {
+      jobId: album.id,
+    });
+
+    logger.info({ albumId: album.id }, 'Album job pushed to queue');
 
     res.status(201).json(album);
   } catch (error: any) {
