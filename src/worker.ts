@@ -1,0 +1,295 @@
+import { Worker, Job } from 'bullmq';
+import { prisma } from './config/database.js';
+import { redisConnection } from './config/queue.js';
+import { config } from './config/env.js';
+import { logger } from './config/logger.js';
+import { validateConfig } from './config/validator.js';
+import { generateText } from './services/openai.js';
+import { generateRecipeText } from './services/recipe-generator.js';
+import { generateRecipeImage } from './services/image-generator.js';
+import { generateTextFile, generateImagesZip, cleanupTempFile } from './services/export.js';
+import { sendAlbumStartedEmail, sendAlbumCompletedEmail } from './services/gmail.js';
+import { uploadAlbumFiles } from './services/drive.js';
+import { publishJobEvent } from './services/pubsub.js';
+
+interface JobData {
+  jobId?: string;
+  albumId?: string;
+  type?: string;
+  input?: any;
+}
+
+// Validate configuration at startup
+try {
+  validateConfig();
+  logger.info('Worker configuration validated');
+} catch (error: any) {
+  logger.error({ error: error.message }, 'Worker configuration validation failed');
+  process.exit(1);
+}
+
+async function processJob(job: Job<JobData>): Promise<any> {
+  const data = job.data;
+
+  // Route to appropriate handler
+  if (data.albumId) {
+    return await processAlbumGeneration(data.albumId);
+  } else if (data.jobId) {
+    return await processLegacyJob(data.jobId, data.input);
+  }
+
+  throw new Error('Invalid job data');
+}
+
+async function processLegacyJob(jobId: string, input: any): Promise<any> {
+  logger.info({ jobId }, 'Processing job');
+
+  await prisma.job.update({
+    where: { id: jobId },
+    data: { status: 'processing' },
+  });
+  publishJobEvent(jobId, 'job.processing');
+
+  try {
+    const result = await generateText({ prompt: input.prompt || '' });
+
+    await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        status: 'completed',
+        output: { content: result.text },
+      },
+    });
+    publishJobEvent(jobId, 'job.completed');
+
+    logger.info({ jobId }, 'Job completed');
+    return result;
+
+  } catch (error: any) {
+    logger.error({ jobId, error: error.message }, 'Job failed');
+
+    await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        status: 'failed',
+        error: error.message,
+      },
+    });
+    publishJobEvent(jobId, 'job.failed');
+
+    throw error;
+  }
+}
+
+async function processAlbumGeneration(albumId: string): Promise<any> {
+  logger.info({ albumId }, 'Processing album generation');
+
+  const startTime = Date.now();
+
+  try {
+    // Fetch album with recipes and user
+    const album = await prisma.album.findUnique({
+      where: { id: albumId },
+      include: { 
+        recipes: { orderBy: { order: 'asc' } },
+        user: true
+      },
+    });
+
+    if (!album) {
+      throw new Error('Album not found');
+    }
+
+    // Update album status to processing
+    await prisma.album.update({
+      where: { id: albumId },
+      data: { status: 'processing' },
+    });
+
+    // Send started email (skip if Gmail not configured)
+    if (config.gmailClientId && config.gmailRefreshToken) {
+      try {
+        await sendAlbumStartedEmail(
+          album.user.email,
+          album.title,
+          album.id,
+          album.itemCount,
+          album.estimatedTime || 0
+        );
+        logger.info({ albumId }, 'Started email sent');
+      } catch (error: any) {
+        logger.error({ error: error.message }, 'Failed to send started email (continuing)');
+      }
+    }
+
+    // Process each recipe
+    for (const recipe of album.recipes) {
+      try {
+        logger.info({ albumId, recipeId: recipe.id, order: recipe.order }, 'Processing recipe');
+
+        // Update recipe status
+        await prisma.recipe.update({
+          where: { id: recipe.id },
+          data: { status: 'processing' },
+        });
+
+        // 1. Generate recipe text via ChatGPT
+        const recipeData = await generateRecipeText({
+          albumTitle: album.title,
+          recipeNumber: recipe.order,
+        });
+
+        // 2. Generate image via configured API
+        const imageResult = await generateRecipeImage({
+          recipeTitle: recipeData.title,
+          apiName: album.imageApi,
+          referenceImages: album.referenceImages as string[] | undefined,
+          albumTitle: album.title,
+        });
+
+        const imageUrl = imageResult.imageUrl;
+
+        // 3. Update recipe with results
+        await prisma.recipe.update({
+          where: { id: recipe.id },
+          data: {
+            title: recipeData.title,
+            ingredients: recipeData.ingredients,
+            steps: recipeData.steps,
+            prepTime: recipeData.prepTime,
+            cookTime: recipeData.cookTime,
+            imageUrl,
+            imagePrompt: imageResult.prompt,
+            status: 'completed',
+          },
+        });
+
+        logger.info({ albumId, recipeId: recipe.id, order: recipe.order }, 'Recipe completed');
+
+      } catch (error: any) {
+        logger.error({ albumId, recipeId: recipe.id, error: error.message }, 'Recipe failed');
+        
+        await prisma.recipe.update({
+          where: { id: recipe.id },
+          data: {
+            status: 'failed',
+            error: error.message,
+          },
+        });
+      }
+    }
+
+    // Calculate actual time
+    const actualTime = Math.floor((Date.now() - startTime) / 1000);
+
+    // Generate export files and upload to Drive (if configured)
+    let textUrl = '';
+    let zipUrl = '';
+    
+    if (config.gmailClientId && config.gmailRefreshToken && config.googleDriveFolderId) {
+      try {
+        logger.info({ albumId }, 'Generating export files for Drive upload');
+        
+        // Generate files
+        const textFilePath = await generateTextFile(album, album.recipes);
+        const zipFilePath = await generateImagesZip(album, album.recipes);
+        
+        logger.info({ albumId, textFilePath, zipFilePath }, 'Files generated, uploading to Drive');
+        
+        // Upload to Drive
+        const driveUrls = await uploadAlbumFiles(textFilePath, zipFilePath, album.title);
+        textUrl = driveUrls.textUrl;
+        zipUrl = driveUrls.zipUrl;
+        
+        logger.info({ albumId, textUrl, zipUrl }, 'Files uploaded to Drive');
+        
+        // Cleanup temp files
+        cleanupTempFile(textFilePath);
+        cleanupTempFile(zipFilePath);
+        
+        // Send completion email with Drive links
+        await sendAlbumCompletedEmail(
+          album.user.email,
+          album.title,
+          album.id,
+          textUrl,
+          zipUrl
+        );
+        
+        logger.info({ albumId }, 'Completion email sent');
+        
+      } catch (error: any) {
+        logger.error({ error: error.message }, 'Failed to upload to Drive or send email (continuing)');
+      }
+    }
+
+    // Mark album as completed
+    await prisma.album.update({
+      where: { id: albumId },
+      data: {
+        status: 'completed',
+        completedAt: new Date(),
+        actualTime,
+      },
+    });
+
+    logger.info({ albumId, actualTime }, 'Album generation completed');
+
+    return { albumId, status: 'completed' };
+
+  } catch (error: any) {
+    logger.error({ albumId, error: error.message }, 'Album generation failed');
+
+    await prisma.album.update({
+      where: { id: albumId },
+      data: {
+        status: 'failed',
+      },
+    });
+
+    throw error;
+  }
+}
+
+const worker = new Worker<JobData>(
+  'content-factory-jobs',
+  processJob,
+  {
+    connection: redisConnection,
+    concurrency: config.workerConcurrency,
+  }
+);
+
+worker.on('error', (error) => {
+  logger.error({ error: error.message }, 'Worker error');
+  process.exit(1);
+});
+
+// Unhandled rejection handler
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error({ reason, promise }, 'Worker unhandled rejection');
+  process.exit(1);
+});
+
+// Uncaught exception handler
+process.on('uncaughtException', (error) => {
+  logger.error({ error: error.message, stack: error.stack }, 'Worker uncaught exception');
+  process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  logger.info('Worker shutting down gracefully');
+  await worker.close();
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('Worker shutting down gracefully');
+  await worker.close();
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+logger.info({ concurrency: config.workerConcurrency }, 'Worker started');
