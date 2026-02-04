@@ -6,6 +6,7 @@ import { logger } from './config/logger.js';
 import { validateConfig } from './config/validator.js';
 import { generateText } from './services/openai.js';
 import { generateRecipeText } from './services/recipe-generator.js';
+import { generateRecipeImage } from './services/image-generator.js';
 import { publishJobEvent } from './services/pubsub.js';
 
 interface JobData {
@@ -116,8 +117,15 @@ async function processAlbumGeneration(albumId: string): Promise<any> {
           recipeNumber: recipe.order,
         });
 
-        // 2. Generate image (placeholder for now)
-        const imageUrl = `https://via.placeholder.com/512x512.png?text=Recipe+${recipe.order}`;
+        // 2. Generate image via configured API
+        const imageResult = await generateRecipeImage({
+          recipeTitle: recipeData.title,
+          apiName: album.imageApi,
+          referenceImages: album.referenceImages as string[] | undefined,
+          albumTitle: album.title,
+        });
+
+        const imageUrl = imageResult.imageUrl;
 
         // 3. Update recipe with results
         await prisma.recipe.update({
@@ -129,6 +137,7 @@ async function processAlbumGeneration(albumId: string): Promise<any> {
             prepTime: recipeData.prepTime,
             cookTime: recipeData.cookTime,
             imageUrl,
+            imagePrompt: imageResult.prompt,
             status: 'completed',
           },
         });

@@ -62,6 +62,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve static images
+app.use('/storage', express.static('storage'));
+
 // Routes
 app.use('/health', healthRouter);
 

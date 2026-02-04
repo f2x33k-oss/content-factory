@@ -33,3 +33,6 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+
+# Storage (generated images)
+storage/
