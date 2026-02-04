@@ -2,12 +2,17 @@ import { useState, useEffect } from 'react';
 import CreateJob from './CreateJob';
 import JobList from './JobList';
 import JobDetails from './JobDetails';
+import AlbumForm from './components/AlbumForm';
+import AlbumList from './components/AlbumList';
+import AlbumDetails from './components/AlbumDetails';
 
 const API_URL = 'http://localhost:3000';
 
 function App() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const [albumRefresh, setAlbumRefresh] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -185,11 +190,36 @@ function App() {
       </div>
 
       {selectedJobId && (
-        <div style={{ border: '1px solid #ccc', padding: '20px' }}>
+        <div style={{ marginBottom: '40px', border: '1px solid #ccc', padding: '20px' }}>
           <h2>Job Details</h2>
           <JobDetails jobId={selectedJobId} />
         </div>
       )}
+
+      <div style={{ marginTop: '60px', borderTop: '3px solid #000', paddingTop: '40px' }}>
+        <h2 style={{ fontSize: '24px', marginBottom: '20px' }}>📚 Recipe Albums</h2>
+        
+        <div style={{ marginBottom: '40px', border: '1px solid #ccc', padding: '20px', background: '#fafafa' }}>
+          <h3>Create Album</h3>
+          <AlbumForm onCreated={() => setAlbumRefresh(r => r + 1)} />
+        </div>
+
+        <div style={{ marginBottom: '40px', border: '1px solid #ccc', padding: '20px' }}>
+          <h3>My Albums</h3>
+          <AlbumList 
+            refresh={albumRefresh}
+            onSelectAlbum={setSelectedAlbumId}
+            selectedAlbumId={selectedAlbumId}
+          />
+        </div>
+
+        {selectedAlbumId && (
+          <div style={{ border: '1px solid #ccc', padding: '20px' }}>
+            <h3>Album Details</h3>
+            <AlbumDetails albumId={selectedAlbumId} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
