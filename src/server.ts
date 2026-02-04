@@ -9,6 +9,7 @@ import { validateConfig } from './config/validator.js';
 import healthRouter from './routes/health.js';
 import jobsRouter from './routes/jobs.js';
 import authRouter from './routes/auth.js';
+import albumsRouter from './routes/albums.js';
 import { setupWebSocket } from './services/websocket.js';
 
 // Validate configuration at startup
@@ -83,17 +84,19 @@ app.get('/ready', async (req, res) => {
 
 app.use('/auth', authRouter);
 app.use('/jobs', jobsRouter);
+app.use('/albums', albumsRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
     name: 'Content Factory API',
-    version: '1.0.0',
-    phase: 'Phase 5',
+    version: '2.0.0',
+    phase: 'V2 - Recipe Albums',
     endpoints: {
       health: '/health',
       auth: '/auth',
       jobs: '/jobs',
+      albums: '/albums',
     },
   });
 });
