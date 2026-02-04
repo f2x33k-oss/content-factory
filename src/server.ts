@@ -39,16 +39,25 @@ const httpServer = createServer(app);
 // Setup WebSocket
 setupWebSocket(httpServer);
 
-// Middleware
-app.use(express.json());
-
-// CORS - MUST be before routes and other middleware
+// CRITICAL: CORS MUST BE FIRST MIDDLEWARE
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Disposition'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 }));
+
+// Middleware
+app.use(express.json());
+
+// Debug logging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
+  next();
+});
 
 // Rate limiting
 const limiter = rateLimit({
