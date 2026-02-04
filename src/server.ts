@@ -28,6 +28,17 @@ const httpServer = createServer(app);
 // Setup WebSocket
 setupWebSocket(httpServer);
 
+// Middleware
+app.use(express.json());
+
+// CORS - MUST be before routes and other middleware
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:5174'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -35,17 +46,6 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP',
 });
 app.use(limiter);
-
-// Middleware
-app.use(express.json());
-
-// CORS
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
 
 // Request logging
 app.use((req, res, next) => {
