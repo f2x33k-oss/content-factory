@@ -17,7 +17,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  jobs Job[]
+  jobs   Job[]
+  albums Album[]
 
   @@map("users")
 }
@@ -39,4 +40,60 @@ model Job {
   @@index([status])
   @@index([createdAt])
   @@map("jobs")
+}
+
+model Album {
+  id              String    @id @default(cuid())
+  userId          Int
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title           String
+  itemCount       Int
+  
+  imageApi        String    // "stability-ai" | "midjourney" | "replicate"
+  textEnabled     Boolean   @default(true)
+  
+  status          String    @default("pending") // pending | processing | completed | failed
+  
+  cost            Float?
+  estimatedTime   Int?      // in seconds
+  actualTime      Int?      // in seconds
+  
+  referenceImages Json?     // URLs of Pinterest images or uploads
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  completedAt     DateTime?
+  
+  recipes         Recipe[]
+  
+  @@index([userId, status])
+  @@index([createdAt])
+  @@map("albums")
+}
+
+model Recipe {
+  id          String   @id @default(cuid())
+  albumId     String
+  album       Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  
+  order       Int      // 1, 2, 3...
+  
+  title       String
+  ingredients Json?    // array of strings
+  steps       Json?    // array of strings
+  prepTime    String?
+  cookTime    String?
+  
+  imageUrl    String?
+  imagePrompt String?
+  
+  status      String   @default("pending") // pending | processing | completed | failed
+  error       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([albumId, order])
+  @@map("recipes")
 }
