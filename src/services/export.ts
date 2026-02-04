@@ -3,33 +3,17 @@ import fs from 'fs';
 import path from 'path';
 import { logger } from '../config/logger.js';
 
-export interface Album {
-  id: string;
-  title: string;
-  itemCount: number;
-}
-
-export interface Recipe {
-  id: string;
-  order: number;
-  title: string;
-  prepTime?: string | null;
-  cookTime?: string | null;
-  ingredients: any;
-  steps: any;
-  imageUrl?: string | null;
-}
-
 /**
  * Generate formatted text file from album recipes
  */
-export async function generateTextFile(album: Album, recipes: Recipe[]): Promise<string> {
-  let content = `═══════════════════════════════════════════\n`;
-  content += `   ${album.title.toUpperCase()}\n`;
-  content += `═══════════════════════════════════════════\n\n`;
-  content += `Album de ${recipes.length} recettes\n\n`;
+export async function generateTextFile(album: any, recipes: any[]): Promise<string> {
+  try {
+    let content = `═══════════════════════════════════════════\n`;
+    content += `   ${album.title.toUpperCase()}\n`;
+    content += `═══════════════════════════════════════════\n\n`;
+    content += `Album de ${recipes.length} recettes\n\n`;
 
-  recipes.forEach((recipe, index) => {
+    recipes.forEach((recipe, index) => {
     content += `───────────────────────────────────────────\n`;
     content += `RECETTE ${index + 1} : ${recipe.title}\n`;
     content += `───────────────────────────────────────────\n\n`;
@@ -67,28 +51,33 @@ export async function generateTextFile(album: Album, recipes: Recipe[]): Promise
   content += `Fin de l'album - ${recipes.length} recettes\n`;
   content += `═══════════════════════════════════════════\n`;
 
-  // Create temp directory if it doesn't exist
-  const tempDir = path.join(process.cwd(), 'temp');
-  if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir, { recursive: true });
+    // Create temp directory if it doesn't exist
+    const tempDir = path.join(process.cwd(), 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const fileName = `${slugify(album.title)}-${album.id.slice(0, 8)}.txt`;
+    const filePath = path.join(tempDir, fileName);
+
+    fs.writeFileSync(filePath, content, 'utf-8');
+
+    logger.info({ albumId: album.id, filePath }, 'Text file generated');
+
+    return filePath;
+  } catch (error: any) {
+    logger.error({ error: error.message, albumTitle: album?.title }, 'Failed to generate text file');
+    throw error;
   }
-
-  const fileName = `${slugify(album.title)}-${album.id.slice(0, 8)}.txt`;
-  const filePath = path.join(tempDir, fileName);
-
-  fs.writeFileSync(filePath, content, 'utf-8');
-
-  logger.info({ albumId: album.id, filePath }, 'Text file generated');
-
-  return filePath;
 }
 
 /**
  * Generate ZIP archive of recipe images
  */
-export async function generateImagesZip(album: Album, recipes: Recipe[]): Promise<string> {
+export async function generateImagesZip(album: any, recipes: any[]): Promise<string> {
   return new Promise((resolve, reject) => {
     try {
+      logger.info({ albumId: album.id, recipeCount: recipes.length }, 'Starting ZIP generation');
       // Create temp directory
       const tempDir = path.join(process.cwd(), 'temp');
       if (!fs.existsSync(tempDir)) {
@@ -119,6 +108,8 @@ export async function generateImagesZip(album: Album, recipes: Recipe[]): Promis
 
       archive.pipe(output);
 
+      let imageCount = 0;
+
       // Add each recipe image to the archive
       recipes.forEach((recipe) => {
         if (recipe.imageUrl) {
@@ -130,16 +121,21 @@ export async function generateImagesZip(album: Album, recipes: Recipe[]): Promis
             imagePath = path.join(process.cwd(), imagePath.replace(/^\//, ''));
           }
 
+          logger.info({ recipeId: recipe.id, imagePath, exists: fs.existsSync(imagePath) }, 'Checking image file');
+
           // Check if file exists
           if (fs.existsSync(imagePath)) {
             const fileName = `${recipe.order}-${slugify(album.title)}.jpg`;
             archive.file(imagePath, { name: fileName });
+            imageCount++;
+            logger.info({ fileName, imagePath }, 'Image added to archive');
           } else {
-            logger.warn({ recipeId: recipe.id, imagePath }, 'Image file not found');
+            logger.warn({ recipeId: recipe.id, imagePath }, 'Image file not found, skipping');
           }
         }
       });
 
+      logger.info({ albumId: album.id, imageCount }, 'Finalizing archive');
       archive.finalize();
 
     } catch (error: any) {

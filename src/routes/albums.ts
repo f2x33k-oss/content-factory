@@ -1,4 +1,5 @@
 import express, { Response } from 'express';
+import path from 'path';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { logger } from '../config/logger.js';
@@ -173,6 +174,8 @@ router.get('/:id/download/text', async (req: AuthRequest, res: Response) => {
     // Generate text file
     filePath = await generateTextFile(album, album.recipes);
 
+    logger.info({ albumId: album.id, filePath }, 'Text file generated');
+
     // Send file
     res.download(filePath, path.basename(filePath), (err) => {
       if (err) {
@@ -186,14 +189,19 @@ router.get('/:id/download/text', async (req: AuthRequest, res: Response) => {
 
     logger.info({ albumId: album.id, userId: req.userId }, 'Album text downloaded');
   } catch (error: any) {
-    logger.error({ error: error.message, userId: req.userId, albumId: req.params.id }, 'Failed to download album text');
+    logger.error({ 
+      error: error.message, 
+      stack: error.stack,
+      userId: req.userId, 
+      albumId: req.params.id 
+    }, 'Failed to download album text');
     
     // Cleanup on error
     if (filePath) {
       cleanupTempFile(filePath);
     }
     
-    res.status(500).json({ error: 'Failed to download album' });
+    res.status(500).json({ error: error.message || 'Failed to download album' });
   }
 });
 
@@ -232,6 +240,8 @@ router.get('/:id/download/images', async (req: AuthRequest, res: Response) => {
     // Generate ZIP file
     zipPath = await generateImagesZip(album, album.recipes);
 
+    logger.info({ albumId: album.id, zipPath }, 'ZIP file generated');
+
     // Send file
     res.download(zipPath, path.basename(zipPath), (err) => {
       if (err) {
@@ -245,14 +255,19 @@ router.get('/:id/download/images', async (req: AuthRequest, res: Response) => {
 
     logger.info({ albumId: album.id, userId: req.userId }, 'Album images downloaded');
   } catch (error: any) {
-    logger.error({ error: error.message, userId: req.userId, albumId: req.params.id }, 'Failed to download album images');
+    logger.error({ 
+      error: error.message, 
+      stack: error.stack,
+      userId: req.userId, 
+      albumId: req.params.id 
+    }, 'Failed to download album images');
     
     // Cleanup on error
     if (zipPath) {
       cleanupTempFile(zipPath);
     }
     
-    res.status(500).json({ error: 'Failed to download album images' });
+    res.status(500).json({ error: error.message || 'Failed to download album images' });
   }
 });
 

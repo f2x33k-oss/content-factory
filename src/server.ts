@@ -3,6 +3,8 @@ import { createServer } from 'http';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import Redis from 'ioredis';
+import fs from 'fs';
+import path from 'path';
 import { config } from './config/env.js';
 import { prisma } from './config/database.js';
 import { logger } from './config/logger.js';
@@ -21,6 +23,15 @@ try {
   logger.error({ error: error.message }, 'Configuration validation failed');
   process.exit(1);
 }
+
+// Ensure required directories exist
+['temp', 'storage', 'storage/images'].forEach(dir => {
+  const dirPath = path.join(process.cwd(), dir);
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+    logger.info({ directory: dir }, 'Directory created');
+  }
+});
 
 const app = express();
 const httpServer = createServer(app);

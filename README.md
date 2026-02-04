@@ -1,6 +1,6 @@
 # Content Factory
 
-Production-ready API for async AI job processing with authentication.
+Production-ready API for async AI job processing with authentication + Recipe Album Generator (V2).
 
 ## Setup
 
@@ -15,16 +15,26 @@ cp .env.example .env
 # Start services
 docker compose up -d
 
-# Database
+# Database sync
 npm run db:generate
-npm run db:migrate
+npx prisma db push
+
+# Create required directories
+mkdir -p temp storage/images
 
 # Start API
 npm run dev
 
 # Start Worker (separate terminal)
 npm run worker:dev
+
+# Start Frontend (separate terminal)
+cd frontend
+npm install
+npm run dev
 ```
+
+Open http://localhost:5173
 
 ## Authentication
 
