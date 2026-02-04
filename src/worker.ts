@@ -5,6 +5,7 @@ import { config } from './config/env.js';
 import { logger } from './config/logger.js';
 import { validateConfig } from './config/validator.js';
 import { generateText } from './services/openai.js';
+import { generateRecipeText } from './services/recipe-generator.js';
 import { publishJobEvent } from './services/pubsub.js';
 
 interface JobData {
@@ -110,38 +111,10 @@ async function processAlbumGeneration(albumId: string): Promise<any> {
         });
 
         // 1. Generate recipe text via ChatGPT
-        const prompt = `Écris une recette à partir de : ${album.title}
-
-Cette recette est la numéro ${recipe.order} de l'album.
-
-Format JSON strict:
-{
-  "title": "titre court de la recette",
-  "prepTime": "15 min",
-  "cookTime": "30 min",
-  "ingredients": ["ingrédient 1", "ingrédient 2", "ingrédient 3"],
-  "steps": ["étape 1", "étape 2", "étape 3"]
-}
-
-Réponds UNIQUEMENT avec le JSON, rien d'autre.`;
-
-        const textResult = await generateText({ prompt });
-        
-        // Parse JSON response
-        let recipeData;
-        try {
-          const cleanedText = textResult.text.replace(/```json|```/g, '').trim();
-          recipeData = JSON.parse(cleanedText);
-        } catch (parseError) {
-          // If JSON parsing fails, extract what we can
-          recipeData = {
-            title: `Recipe ${recipe.order}`,
-            prepTime: '15 min',
-            cookTime: '30 min',
-            ingredients: ['Generated content parsing failed'],
-            steps: [textResult.text],
-          };
-        }
+        const recipeData = await generateRecipeText({
+          albumTitle: album.title,
+          recipeNumber: recipe.order,
+        });
 
         // 2. Generate image (placeholder for now)
         const imageUrl = `https://via.placeholder.com/512x512.png?text=Recipe+${recipe.order}`;

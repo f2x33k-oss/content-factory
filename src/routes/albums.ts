@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { logger } from '../config/logger.js';
 import { jobQueue } from '../config/queue.js';
+import { estimateAlbumGeneration } from '../services/recipe-generator.js';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -31,6 +32,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       itemCount = match ? parseInt(match[0]) : 10;
     }
 
+    // Calculate cost and time estimates
+    const estimation = estimateAlbumGeneration(itemCount, input.textEnabled, true);
+
     // Create album with N recipe placeholders
     const album = await prisma.album.create({
       data: {
@@ -40,6 +44,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         imageApi: input.imageApi,
         textEnabled: input.textEnabled,
         status: 'pending',
+        cost: estimation.cost,
+        estimatedTime: estimation.estimatedTime,
         referenceImages: input.referenceImages || null,
         recipes: {
           create: Array.from({ length: itemCount }, (_, i) => ({
