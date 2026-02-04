@@ -148,68 +148,61 @@ router.get('/:id/download/text', async (req: AuthRequest, res: Response) => {
 
   try {
     const { id } = req.params;
-    console.log('[Download TXT] Requested for album:', id);
-
-    const album = await prisma.album.findUnique({
-      where: { id },
-      include: {
-        recipes: {
-          orderBy: { order: 'asc' },
-          where: { status: 'completed' },
-        },
+    const userId = req.userId;
+    
+    logger.info(`Text download requested for album: ${id} by user: ${userId}`);
+    
+    const album = await prisma.album.findFirst({
+      where: { 
+        id,
+        userId 
       },
+      include: { 
+        recipes: { 
+          orderBy: { order: 'asc' } 
+        } 
+      }
     });
-
-    console.log('[Download TXT] Album found:', album ? album.title : 'NULL');
-    console.log('[Download TXT] Recipes count:', album?.recipes.length || 0);
-
+    
     if (!album) {
+      logger.warn(`Album not found: ${id}`);
       return res.status(404).json({ error: 'Album not found' });
     }
-
-    if (album.userId !== req.userId) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    if (album.recipes.length === 0) {
-      return res.status(400).json({ error: 'No recipes available for download' });
-    }
-
-    // Generate text file
-    console.log('[Download TXT] Generating text file...');
-    filePath = await generateTextFile(album, album.recipes);
-    console.log('[Download TXT] File generated:', filePath);
-
-    logger.info({ albumId: album.id, filePath }, 'Text file generated');
-
-    // Send file
-    res.download(filePath, path.basename(filePath), (err) => {
-      if (err) {
-        console.error('[Download TXT] Download error:', err);
-        logger.error({ error: err.message, filePath }, 'Download error');
-      }
-      // Cleanup after download
-      if (filePath) {
-        setTimeout(() => cleanupTempFile(filePath!), 1000);
-      }
-    });
-
-    logger.info({ albumId: album.id, userId: req.userId }, 'Album text downloaded');
-  } catch (error: any) {
-    console.error('[Download TXT] ERROR:', error);
-    logger.error({ 
-      error: error.message, 
-      stack: error.stack,
-      userId: req.userId, 
-      albumId: req.params.id 
-    }, 'Failed to download album text');
     
-    // Cleanup on error
+    if (album.status !== 'completed') {
+      logger.warn(`Album not completed: ${id}, status: ${album.status}`);
+      return res.status(400).json({ 
+        error: 'Album not completed yet',
+        status: album.status 
+      });
+    }
+    
+    logger.info(`Generating text file for: ${album.title}`);
+    filePath = await generateTextFile(album, album.recipes);
+    
+    const fileName = `${slugify(album.title)}.txt`;
+    
+    res.download(filePath, fileName, (err) => {
+      if (err) {
+        logger.error('Download error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Download failed' });
+        }
+      }
+      cleanupTempFile(filePath!);
+    });
+    
+  } catch (error: any) {
+    logger.error('Text download error:', error);
+    
     if (filePath) {
       cleanupTempFile(filePath);
     }
     
-    res.status(500).json({ error: error.message || 'Failed to download album' });
+    res.status(500).json({ 
+      error: 'Failed to generate text file',
+      message: error.message 
+    });
   }
 });
 
@@ -219,72 +212,71 @@ router.get('/:id/download/images', async (req: AuthRequest, res: Response) => {
 
   try {
     const { id } = req.params;
-    console.log('[Download ZIP] Requested for album:', id);
-
-    const album = await prisma.album.findUnique({
-      where: { id },
-      include: {
-        recipes: {
-          orderBy: { order: 'asc' },
-          where: { 
-            status: 'completed',
-            imageUrl: { not: null },
-          },
-        },
+    const userId = req.userId;
+    
+    logger.info(`ZIP download requested for album: ${id} by user: ${userId}`);
+    
+    const album = await prisma.album.findFirst({
+      where: { 
+        id,
+        userId 
       },
+      include: { 
+        recipes: { 
+          orderBy: { order: 'asc' } 
+        } 
+      }
     });
-
-    console.log('[Download ZIP] Album found:', album ? album.title : 'NULL');
-    console.log('[Download ZIP] Recipes with images:', album?.recipes.length || 0);
-
+    
     if (!album) {
+      logger.warn(`Album not found: ${id}`);
       return res.status(404).json({ error: 'Album not found' });
     }
-
-    if (album.userId !== req.userId) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    if (album.recipes.length === 0) {
-      return res.status(400).json({ error: 'No images available for download' });
-    }
-
-    // Generate ZIP file
-    console.log('[Download ZIP] Generating ZIP file...');
-    zipPath = await generateImagesZip(album, album.recipes);
-    console.log('[Download ZIP] ZIP generated:', zipPath);
-
-    logger.info({ albumId: album.id, zipPath }, 'ZIP file generated');
-
-    // Send file
-    res.download(zipPath, path.basename(zipPath), (err) => {
-      if (err) {
-        console.error('[Download ZIP] Download error:', err);
-        logger.error({ error: err.message, zipPath }, 'Download error');
-      }
-      // Cleanup after download
-      if (zipPath) {
-        setTimeout(() => cleanupTempFile(zipPath!), 1000);
-      }
-    });
-
-    logger.info({ albumId: album.id, userId: req.userId }, 'Album images downloaded');
-  } catch (error: any) {
-    console.error('[Download ZIP] ERROR:', error);
-    logger.error({ 
-      error: error.message, 
-      stack: error.stack,
-      userId: req.userId, 
-      albumId: req.params.id 
-    }, 'Failed to download album images');
     
-    // Cleanup on error
+    if (album.status !== 'completed') {
+      logger.warn(`Album not completed: ${id}, status: ${album.status}`);
+      return res.status(400).json({ 
+        error: 'Album not completed yet',
+        status: album.status 
+      });
+    }
+    
+    logger.info(`Generating ZIP for: ${album.title}`);
+    zipPath = await generateImagesZip(album, album.recipes);
+    
+    const zipName = `${slugify(album.title)}.zip`;
+    
+    res.download(zipPath, zipName, (err) => {
+      if (err) {
+        logger.error('Download error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Download failed' });
+        }
+      }
+      cleanupTempFile(zipPath!);
+    });
+    
+  } catch (error: any) {
+    logger.error('ZIP download error:', error);
+    
     if (zipPath) {
       cleanupTempFile(zipPath);
     }
     
-    res.status(500).json({ error: error.message || 'Failed to download album images' });
+    res.status(500).json({ 
+      error: 'Failed to generate ZIP file',
+      message: error.message 
+    });
   }
 });
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
 
 export default router;
