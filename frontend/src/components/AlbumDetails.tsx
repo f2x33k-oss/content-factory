@@ -110,48 +110,108 @@ export default function AlbumDetails({ albumId }: Props) {
       )}
 
       <h4>Recipes ({album.recipes.length}):</h4>
-      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+      <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
         {album.recipes.map((recipe) => (
           <div
             key={recipe.id}
             style={{
-              border: '1px solid #ddd',
-              padding: '10px',
-              marginBottom: '10px',
-              background: recipe.status === 'completed' ? '#f0fff0' : '#fff',
+              padding: '15px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '8px',
+              marginBottom: '15px',
+              backgroundColor: recipe.status === 'completed' ? '#f0fff0' : '#fff',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>{recipe.order}. {recipe.title}</strong>
-              <span style={{ 
-                fontSize: '12px', 
-                color: recipe.status === 'completed' ? 'green' : recipe.status === 'failed' ? 'red' : 'orange'
-              }}>
-                {recipe.status}
-              </span>
-            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <h4 style={{ margin: '0 0 10px 0' }}>
+                  {recipe.order}. {recipe.title}
+                </h4>
+                
+                <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
+                  <span style={{ 
+                    backgroundColor: recipe.status === 'completed' ? '#4caf50' : recipe.status === 'failed' ? '#f44336' : '#ff9800',
+                    color: 'white',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}>
+                    {recipe.status}
+                  </span>
+                </div>
 
-            {recipe.status === 'completed' && (
-              <div style={{ marginTop: '10px', fontSize: '12px' }}>
-                {recipe.prepTime && <div>⏱️ Prep: {recipe.prepTime}</div>}
-                {recipe.cookTime && <div>🔥 Cook: {recipe.cookTime}</div>}
-                {recipe.imageUrl && (
-                  <div style={{ marginTop: '5px' }}>
-                    <img
-                      src={`${API_URL}${recipe.imageUrl}`}
-                      alt={recipe.title}
-                      style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '4px' }}
-                    />
+                {recipe.status === 'completed' && (
+                  <>
+                    {recipe.prepTime && (
+                      <div style={{ fontSize: '14px', marginBottom: '5px' }}>
+                        ⏱️ Préparation : <strong>{recipe.prepTime}</strong>
+                      </div>
+                    )}
+                    
+                    {recipe.cookTime && (
+                      <div style={{ fontSize: '14px', marginBottom: '15px' }}>
+                        🔥 Cuisson : <strong>{recipe.cookTime}</strong>
+                      </div>
+                    )}
+
+                    {recipe.ingredients && recipe.ingredients.length > 0 && (
+                      <div style={{ marginBottom: '15px' }}>
+                        <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 'bold' }}>INGRÉDIENTS :</h5>
+                        <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                          {recipe.ingredients.map((ing: string, idx: number) => (
+                            <li key={idx} style={{ fontSize: '14px', marginBottom: '3px' }}>
+                              {ing}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {recipe.steps && recipe.steps.length > 0 && (
+                      <div style={{ marginBottom: '15px' }}>
+                        <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 'bold' }}>ÉTAPES :</h5>
+                        <ol style={{ margin: 0, paddingLeft: '20px' }}>
+                          {recipe.steps.map((step: string, idx: number) => (
+                            <li key={idx} style={{ fontSize: '14px', marginBottom: '5px' }}>
+                              {step}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {recipe.error && (
+                  <div style={{ 
+                    color: '#d32f2f', 
+                    fontSize: '14px',
+                    backgroundColor: '#ffebee',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    marginTop: '10px'
+                  }}>
+                    ❌ {recipe.error}
                   </div>
                 )}
               </div>
-            )}
 
-            {recipe.error && (
-              <div style={{ color: 'red', fontSize: '12px', marginTop: '5px' }}>
-                Error: {recipe.error}
-              </div>
-            )}
+              {recipe.imageUrl && recipe.status === 'completed' && (
+                <div style={{ marginLeft: '20px' }}>
+                  <img 
+                    src={`${API_URL}${recipe.imageUrl}`}
+                    alt={recipe.title}
+                    style={{ 
+                      width: '200px', 
+                      height: '200px', 
+                      objectFit: 'cover',
+                      borderRadius: '8px',
+                      border: '2px solid #e0e0e0'
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>

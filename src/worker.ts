@@ -7,6 +7,9 @@ import { validateConfig } from './config/validator.js';
 import { generateText } from './services/openai.js';
 import { generateRecipeText } from './services/recipe-generator.js';
 import { generateRecipeImage } from './services/image-generator.js';
+import { generateTextFile, generateImagesZip, cleanupTempFile } from './services/export.js';
+import { sendAlbumStartedEmail, sendAlbumCompletedEmail } from './services/gmail.js';
+import { uploadAlbumFiles } from './services/drive.js';
 import { publishJobEvent } from './services/pubsub.js';
 
 interface JobData {
@@ -84,10 +87,13 @@ async function processAlbumGeneration(albumId: string): Promise<any> {
   const startTime = Date.now();
 
   try {
-    // Fetch album with recipes
+    // Fetch album with recipes and user
     const album = await prisma.album.findUnique({
       where: { id: albumId },
-      include: { recipes: { orderBy: { order: 'asc' } } },
+      include: { 
+        recipes: { orderBy: { order: 'asc' } },
+        user: true
+      },
     });
 
     if (!album) {
@@ -99,6 +105,22 @@ async function processAlbumGeneration(albumId: string): Promise<any> {
       where: { id: albumId },
       data: { status: 'processing' },
     });
+
+    // Send started email (skip if Gmail not configured)
+    if (config.gmailClientId && config.gmailRefreshToken) {
+      try {
+        await sendAlbumStartedEmail(
+          album.user.email,
+          album.title,
+          album.id,
+          album.itemCount,
+          album.estimatedTime || 0
+        );
+        logger.info({ albumId }, 'Started email sent');
+      } catch (error: any) {
+        logger.error({ error: error.message }, 'Failed to send started email (continuing)');
+      }
+    }
 
     // Process each recipe
     for (const recipe of album.recipes) {
@@ -159,6 +181,47 @@ async function processAlbumGeneration(albumId: string): Promise<any> {
 
     // Calculate actual time
     const actualTime = Math.floor((Date.now() - startTime) / 1000);
+
+    // Generate export files and upload to Drive (if configured)
+    let textUrl = '';
+    let zipUrl = '';
+    
+    if (config.gmailClientId && config.gmailRefreshToken && config.googleDriveFolderId) {
+      try {
+        logger.info({ albumId }, 'Generating export files for Drive upload');
+        
+        // Generate files
+        const textFilePath = await generateTextFile(album, album.recipes);
+        const zipFilePath = await generateImagesZip(album, album.recipes);
+        
+        logger.info({ albumId, textFilePath, zipFilePath }, 'Files generated, uploading to Drive');
+        
+        // Upload to Drive
+        const driveUrls = await uploadAlbumFiles(textFilePath, zipFilePath, album.title);
+        textUrl = driveUrls.textUrl;
+        zipUrl = driveUrls.zipUrl;
+        
+        logger.info({ albumId, textUrl, zipUrl }, 'Files uploaded to Drive');
+        
+        // Cleanup temp files
+        cleanupTempFile(textFilePath);
+        cleanupTempFile(zipFilePath);
+        
+        // Send completion email with Drive links
+        await sendAlbumCompletedEmail(
+          album.user.email,
+          album.title,
+          album.id,
+          textUrl,
+          zipUrl
+        );
+        
+        logger.info({ albumId }, 'Completion email sent');
+        
+      } catch (error: any) {
+        logger.error({ error: error.message }, 'Failed to upload to Drive or send email (continuing)');
+      }
+    }
 
     // Mark album as completed
     await prisma.album.update({

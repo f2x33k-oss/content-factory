@@ -21,4 +21,13 @@ export const config = {
   
   // Worker
   workerConcurrency: parseInt(process.env.WORKER_CONCURRENCY || '3', 10),
+  
+  // Gmail API
+  gmailClientId: process.env.GMAIL_CLIENT_ID || '',
+  gmailClientSecret: process.env.GMAIL_CLIENT_SECRET || '',
+  gmailRefreshToken: process.env.GMAIL_REFRESH_TOKEN || '',
+  gmailFromEmail: process.env.GMAIL_FROM_EMAIL || '',
+  
+  // Google Drive API
+  googleDriveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID || '',
 };
