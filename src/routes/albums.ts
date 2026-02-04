@@ -150,7 +150,9 @@ router.get('/:id/download/text', async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const userId = req.userId;
     
-    logger.info(`Text download requested for album: ${id} by user: ${userId}`);
+    console.log('=== TEXT DOWNLOAD DEBUG ===');
+    console.log('Album ID:', id);
+    console.log('User ID:', userId);
     
     const album = await prisma.album.findFirst({
       where: { 
@@ -164,36 +166,48 @@ router.get('/:id/download/text', async (req: AuthRequest, res: Response) => {
       }
     });
     
+    console.log('Album found:', !!album);
+    if (album) {
+      console.log('Album status:', album.status);
+      console.log('Recipes count:', album.recipes.length);
+    }
+    
     if (!album) {
-      logger.warn(`Album not found: ${id}`);
+      console.log('ERROR: Album not found');
       return res.status(404).json({ error: 'Album not found' });
     }
     
     if (album.status !== 'completed') {
-      logger.warn(`Album not completed: ${id}, status: ${album.status}`);
+      console.log('ERROR: Album not completed, status:', album.status);
       return res.status(400).json({ 
         error: 'Album not completed yet',
         status: album.status 
       });
     }
     
-    logger.info(`Generating text file for: ${album.title}`);
+    console.log('Calling generateTextFile...');
     filePath = await generateTextFile(album, album.recipes);
+    console.log('File generated at:', filePath);
     
     const fileName = `${slugify(album.title)}.txt`;
+    console.log('Downloading as:', fileName);
     
     res.download(filePath, fileName, (err) => {
       if (err) {
-        logger.error('Download error:', err);
+        console.error('Download error:', err);
         if (!res.headersSent) {
-          res.status(500).json({ error: 'Download failed' });
+          res.status(500).json({ error: 'Download failed', details: err.message });
         }
+      } else {
+        console.log('Download successful');
       }
       cleanupTempFile(filePath!);
     });
     
   } catch (error: any) {
-    logger.error('Text download error:', error);
+    console.error('=== TEXT DOWNLOAD ERROR ===');
+    console.error('Error:', error);
+    console.error('Stack:', error.stack);
     
     if (filePath) {
       cleanupTempFile(filePath);
@@ -201,7 +215,8 @@ router.get('/:id/download/text', async (req: AuthRequest, res: Response) => {
     
     res.status(500).json({ 
       error: 'Failed to generate text file',
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -214,7 +229,9 @@ router.get('/:id/download/images', async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const userId = req.userId;
     
-    logger.info(`ZIP download requested for album: ${id} by user: ${userId}`);
+    console.log('=== ZIP DOWNLOAD DEBUG ===');
+    console.log('Album ID:', id);
+    console.log('User ID:', userId);
     
     const album = await prisma.album.findFirst({
       where: { 
@@ -228,36 +245,49 @@ router.get('/:id/download/images', async (req: AuthRequest, res: Response) => {
       }
     });
     
+    console.log('Album found:', !!album);
+    if (album) {
+      console.log('Album status:', album.status);
+      console.log('Recipes count:', album.recipes.length);
+      console.log('Recipes with images:', album.recipes.filter(r => r.imageUrl).length);
+    }
+    
     if (!album) {
-      logger.warn(`Album not found: ${id}`);
+      console.log('ERROR: Album not found');
       return res.status(404).json({ error: 'Album not found' });
     }
     
     if (album.status !== 'completed') {
-      logger.warn(`Album not completed: ${id}, status: ${album.status}`);
+      console.log('ERROR: Album not completed, status:', album.status);
       return res.status(400).json({ 
         error: 'Album not completed yet',
         status: album.status 
       });
     }
     
-    logger.info(`Generating ZIP for: ${album.title}`);
+    console.log('Calling generateImagesZip...');
     zipPath = await generateImagesZip(album, album.recipes);
+    console.log('ZIP generated at:', zipPath);
     
     const zipName = `${slugify(album.title)}.zip`;
+    console.log('Downloading as:', zipName);
     
     res.download(zipPath, zipName, (err) => {
       if (err) {
-        logger.error('Download error:', err);
+        console.error('Download error:', err);
         if (!res.headersSent) {
-          res.status(500).json({ error: 'Download failed' });
+          res.status(500).json({ error: 'Download failed', details: err.message });
         }
+      } else {
+        console.log('Download successful');
       }
       cleanupTempFile(zipPath!);
     });
     
   } catch (error: any) {
-    logger.error('ZIP download error:', error);
+    console.error('=== ZIP DOWNLOAD ERROR ===');
+    console.error('Error:', error);
+    console.error('Stack:', error.stack);
     
     if (zipPath) {
       cleanupTempFile(zipPath);
@@ -265,7 +295,8 @@ router.get('/:id/download/images', async (req: AuthRequest, res: Response) => {
     
     res.status(500).json({ 
       error: 'Failed to generate ZIP file',
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

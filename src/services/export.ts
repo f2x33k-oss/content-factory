@@ -14,13 +14,15 @@ function slugify(text: string): string {
 
 export async function generateTextFile(album: any, recipes: any[]): Promise<string> {
   try {
-    logger.info(`Generating text file for album: ${album.title}`);
+    console.log('=== GENERATE TEXT FILE ===');
+    console.log('Album:', album.title);
+    console.log('Recipes:', recipes.length);
     
     const tempDir = path.join(process.cwd(), 'temp');
+    console.log('Temp dir:', tempDir);
     
-    // Ensure temp directory exists
     if (!fs.existsSync(tempDir)) {
-      logger.info('Creating temp directory');
+      console.log('Creating temp directory...');
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
@@ -30,12 +32,12 @@ export async function generateTextFile(album: any, recipes: any[]): Promise<stri
 
 Nombre de recettes : ${recipes.length}
 Status : ${album.status}
-Coût : $${album.cost || '0.00'}
-Temps estimé : ${album.estimatedTime ? Math.ceil(album.estimatedTime / 60) + ' min' : 'N/A'}
 
 `;
 
     recipes.forEach((recipe: any, index: number) => {
+      console.log(`Adding recipe ${index + 1}: ${recipe.title}`);
+      
       content += `
 ───────────────────────────────────────────
 RECETTE ${index + 1} : ${recipe.title || 'Sans titre'}
@@ -44,72 +46,84 @@ RECETTE ${index + 1} : ${recipe.title || 'Sans titre'}
 `;
       
       if (recipe.prepTime || recipe.cookTime) {
-        content += `⏱️ Temps de préparation : ${recipe.prepTime || 'N/A'}\n`;
-        content += `🔥 Temps de cuisson : ${recipe.cookTime || 'N/A'}\n\n`;
+        content += `⏱️ Préparation : ${recipe.prepTime || 'N/A'}\n`;
+        content += `🔥 Cuisson : ${recipe.cookTime || 'N/A'}\n\n`;
       }
       
-      if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+      if (recipe.ingredients) {
         content += `INGRÉDIENTS :\n`;
-        recipe.ingredients.forEach((ing: string) => {
+        const ingredients = Array.isArray(recipe.ingredients) 
+          ? recipe.ingredients 
+          : [];
+        ingredients.forEach((ing: string) => {
           content += `• ${ing}\n`;
         });
         content += '\n';
       }
       
-      if (recipe.steps && Array.isArray(recipe.steps)) {
+      if (recipe.steps) {
         content += `ÉTAPES :\n`;
-        recipe.steps.forEach((step: string, i: number) => {
+        const steps = Array.isArray(recipe.steps) 
+          ? recipe.steps 
+          : [];
+        steps.forEach((step: string, i: number) => {
           content += `${i + 1}. ${step}\n`;
         });
         content += '\n';
       }
-      
-      content += '\n';
     });
 
-    const fileName = `${slugify(album.title)}.txt`;
+    const fileName = slugify(album.title) + '.txt';
     const filePath = path.join(tempDir, fileName);
     
-    logger.info(`Writing text file to: ${filePath}`);
+    console.log('Writing to:', filePath);
     fs.writeFileSync(filePath, content, 'utf-8');
+    console.log('File written successfully');
     
-    logger.info(`Text file generated successfully: ${fileName}`);
     return filePath;
     
   } catch (error: any) {
-    logger.error('Error generating text file:', error);
+    console.error('=== GENERATE TEXT FILE ERROR ===');
+    console.error(error);
     throw error;
   }
 }
 
 export async function generateImagesZip(album: any, recipes: any[]): Promise<string> {
   try {
-    logger.info(`Generating images ZIP for album: ${album.title}`);
+    console.log('=== GENERATE IMAGES ZIP ===');
+    console.log('Album:', album.title);
+    console.log('Recipes:', recipes.length);
     
     const tempDir = path.join(process.cwd(), 'temp');
+    console.log('Temp dir:', tempDir);
     
     // Ensure temp directory exists
     if (!fs.existsSync(tempDir)) {
-      logger.info('Creating temp directory');
+      console.log('Creating temp directory...');
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
-    const zipName = `${slugify(album.title)}.zip`;
+    const zipName = slugify(album.title) + '.zip';
     const zipPath = path.join(tempDir, zipName);
-    
-    logger.info(`Creating ZIP at: ${zipPath}`);
+    console.log('ZIP path:', zipPath);
     
     return new Promise((resolve, reject) => {
       const output = fs.createWriteStream(zipPath);
       const archive = archiver('zip', { zlib: { level: 9 } });
       
       output.on('close', () => {
-        logger.info(`ZIP created: ${archive.pointer()} total bytes`);
+        console.log('ZIP created:', archive.pointer(), 'total bytes');
         resolve(zipPath);
       });
       
+      output.on('error', (err) => {
+        console.error('Output stream error:', err);
+        reject(err);
+      });
+      
       archive.on('error', (err) => {
-        logger.error('Archive error:', err);
+        console.error('Archive error:', err);
         reject(err);
       });
       
@@ -118,32 +132,42 @@ export async function generateImagesZip(album: any, recipes: any[]): Promise<str
       let imagesAdded = 0;
       
       recipes.forEach((recipe: any, index: number) => {
+        console.log(`Processing recipe ${index + 1}: ${recipe.title}`);
+        
         if (recipe.imageUrl) {
           const imagePath = path.join(process.cwd(), recipe.imageUrl.replace(/^\//, ''));
+          console.log('Image path:', imagePath);
+          console.log('Exists:', fs.existsSync(imagePath));
           
           if (fs.existsSync(imagePath)) {
             const fileName = `${index + 1}-${slugify(recipe.title || album.title)}.jpg`;
-            logger.info(`Adding image to ZIP: ${fileName}`);
+            console.log('Adding to archive:', fileName);
             archive.file(imagePath, { name: fileName });
             imagesAdded++;
           } else {
-            logger.warn(`Image not found: ${imagePath}`);
+            console.warn('Image not found:', imagePath);
           }
+        } else {
+          console.log('No imageUrl for recipe');
         }
       });
       
+      console.log('Images added to archive:', imagesAdded);
+      
       if (imagesAdded === 0) {
-        logger.warn('No images found to add to ZIP');
+        console.log('No images found, adding placeholder README');
         archive.append('No images were generated for this album.', { 
           name: 'README.txt' 
         });
       }
       
+      console.log('Finalizing archive...');
       archive.finalize();
     });
     
   } catch (error: any) {
-    logger.error('Error generating ZIP:', error);
+    console.error('=== GENERATE ZIP ERROR ===');
+    console.error(error);
     throw error;
   }
 }
