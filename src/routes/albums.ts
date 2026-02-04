@@ -4,6 +4,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { logger } from '../config/logger.js';
 import { jobQueue } from '../config/queue.js';
 import { estimateAlbumGeneration } from '../services/recipe-generator.js';
+import { generateTextFile, generateImagesZip, cleanupTempFile } from '../services/export.js';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -142,6 +143,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 // GET /albums/:id/download/text - Download album as .txt file
 router.get('/:id/download/text', async (req: AuthRequest, res: Response) => {
+  let filePath: string | null = null;
+
   try {
     const { id } = req.params;
 
@@ -167,57 +170,37 @@ router.get('/:id/download/text', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'No recipes available for download' });
     }
 
-    // Generate text content
-    let content = `═══════════════════════════════════════════\n`;
-    content += `   ${album.title.toUpperCase()}\n`;
-    content += `═══════════════════════════════════════════\n\n`;
+    // Generate text file
+    filePath = await generateTextFile(album, album.recipes);
 
-    album.recipes.forEach((recipe, index) => {
-      content += `───────────────────────────────────────────\n`;
-      content += `RECETTE ${index + 1} : ${recipe.title}\n`;
-      content += `───────────────────────────────────────────\n\n`;
-
-      if (recipe.prepTime || recipe.cookTime) {
-        content += `⏱️ TEMPS :\n`;
-        if (recipe.prepTime) content += `  Préparation : ${recipe.prepTime}\n`;
-        if (recipe.cookTime) content += `  Cuisson : ${recipe.cookTime}\n`;
-        content += `\n`;
+    // Send file
+    res.download(filePath, path.basename(filePath), (err) => {
+      if (err) {
+        logger.error({ error: err.message, filePath }, 'Download error');
       }
-
-      if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
-        content += `📝 INGRÉDIENTS :\n`;
-        (recipe.ingredients as string[]).forEach(ing => {
-          content += `  • ${ing}\n`;
-        });
-        content += `\n`;
+      // Cleanup after download
+      if (filePath) {
+        setTimeout(() => cleanupTempFile(filePath!), 1000);
       }
-
-      if (recipe.steps && Array.isArray(recipe.steps)) {
-        content += `👨‍🍳 ÉTAPES :\n`;
-        (recipe.steps as string[]).forEach((step, i) => {
-          content += `  ${i + 1}. ${step}\n`;
-        });
-        content += `\n`;
-      }
-
-      content += `\n`;
     });
-
-    const fileName = slugify(album.title) + '.txt';
-    
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.send(content);
 
     logger.info({ albumId: album.id, userId: req.userId }, 'Album text downloaded');
   } catch (error: any) {
     logger.error({ error: error.message, userId: req.userId, albumId: req.params.id }, 'Failed to download album text');
+    
+    // Cleanup on error
+    if (filePath) {
+      cleanupTempFile(filePath);
+    }
+    
     res.status(500).json({ error: 'Failed to download album' });
   }
 });
 
 // GET /albums/:id/download/images - Download album images as .zip
 router.get('/:id/download/images', async (req: AuthRequest, res: Response) => {
+  let zipPath: string | null = null;
+
   try {
     const { id } = req.params;
 
@@ -246,34 +229,31 @@ router.get('/:id/download/images', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'No images available for download' });
     }
 
-    // For now, return JSON with image URLs
-    // TODO: Implement actual ZIP generation with archiver in Phase 6
-    res.json({
-      albumId: album.id,
-      title: album.title,
-      images: album.recipes.map(recipe => ({
-        order: recipe.order,
-        title: recipe.title,
-        imageUrl: recipe.imageUrl,
-        fileName: `${recipe.order}-${slugify(album.title)}.jpg`,
-      })),
-      note: 'ZIP generation will be implemented in Phase 6',
+    // Generate ZIP file
+    zipPath = await generateImagesZip(album, album.recipes);
+
+    // Send file
+    res.download(zipPath, path.basename(zipPath), (err) => {
+      if (err) {
+        logger.error({ error: err.message, zipPath }, 'Download error');
+      }
+      // Cleanup after download
+      if (zipPath) {
+        setTimeout(() => cleanupTempFile(zipPath!), 1000);
+      }
     });
 
-    logger.info({ albumId: album.id, userId: req.userId }, 'Album images requested');
+    logger.info({ albumId: album.id, userId: req.userId }, 'Album images downloaded');
   } catch (error: any) {
     logger.error({ error: error.message, userId: req.userId, albumId: req.params.id }, 'Failed to download album images');
+    
+    // Cleanup on error
+    if (zipPath) {
+      cleanupTempFile(zipPath);
+    }
+    
     res.status(500).json({ error: 'Failed to download album images' });
   }
 });
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
 
 export default router;

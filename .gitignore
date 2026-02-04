@@ -36,3 +36,6 @@ Thumbs.db
 
 # Storage (generated images)
 storage/
+
+# Temporary files
+temp/
